@@ -141,7 +141,7 @@ export default async function handler(req, res) {
       })
     );
 
-    // Collect unique job IDs
+    // Collect unique job IDs per day
     const allJobIds = new Set();
     const dayJobIds = [];
     allDayAppointments.forEach(appointments => {
@@ -152,6 +152,22 @@ export default async function handler(req, res) {
 
     // Batch fetch all unique jobs
     const jobsMap = await batchFetchJobs(tenantId, headers, [...allJobIds]);
+
+    // =============================================
+    // MULTI-DAY REVENUE ALLOCATION
+    // Count how many of our 3 days each job appears on.
+    // Revenue is split evenly across those days.
+    // e.g. a 3-day install at $30k = $10k per day
+    // =============================================
+    const jobDayCount = {}; // jobId -> number of days it appears in our window
+    dayJobIds.forEach(jobIds => {
+      jobIds.forEach(id => {
+        jobDayCount[id] = (jobDayCount[id] || 0) + 1;
+      });
+    });
+
+    // Track which jobs got split for debugging
+    const multiDayJobs = [];
 
     // Build day summaries with department breakdowns
     const days = businessDays.map((day, i) => {
@@ -169,7 +185,22 @@ export default async function handler(req, res) {
 
         const jobTypeName = jtMap[job.jobTypeId] || '';
         const dept = JOB_TYPE_MAP[jobTypeName] || null;
-        const preTaxRevenue = Math.round(((job.total || 0) / HST_RATE) * 100) / 100;
+        const fullPreTaxRevenue = Math.round(((job.total || 0) / HST_RATE) * 100) / 100;
+
+        // Split revenue across the number of days this job spans
+        const numDays = jobDayCount[id] || 1;
+        const allocatedRevenue = Math.round((fullPreTaxRevenue / numDays) * 100) / 100;
+
+        // Track multi-day jobs for debugging (only on first day)
+        if (numDays > 1 && i === 0) {
+          multiDayJobs.push({
+            jobId: id,
+            jobType: jobTypeName,
+            fullRevenue: fullPreTaxRevenue,
+            daysSpanned: numDays,
+            dailyAllocation: allocatedRevenue
+          });
+        }
 
         // Check leads and plans regardless of department
         if (LEAD_JOB_TYPES.includes(jobTypeName)) leadsRun++;
@@ -177,9 +208,9 @@ export default async function handler(req, res) {
 
         if (dept) {
           depts[dept].jobs++;
-          depts[dept].rev += preTaxRevenue;
+          depts[dept].rev += allocatedRevenue;
           totalJobs++;
-          totalRevenue += preTaxRevenue;
+          totalRevenue += allocatedRevenue;
         } else {
           excluded++;
         }
@@ -198,7 +229,12 @@ export default async function handler(req, res) {
       };
     });
 
-    res.status(200).json({ success: true, timestamp: new Date().toISOString(), days });
+    res.status(200).json({
+      success: true,
+      timestamp: new Date().toISOString(),
+      days,
+      multiDayJobs: multiDayJobs.length > 0 ? multiDayJobs : undefined
+    });
   } catch (error) {
     console.error('Upcoming WTD fetch error:', error);
     res.status(500).json({ success: false, error: error.message });
