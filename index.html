@@ -145,7 +145,48 @@ var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 
 var allJobs = [];
 
-// Persist targets in localStorage so they survive refreshes
+// ========================================
+// JOB TYPE → DEPARTMENT MAPPING
+// Matches the Excel spreadsheet exactly.
+// Job types not listed here are EXCLUDED from counts.
+// ========================================
+var JOB_TYPE_MAP = {
+  // Install
+  'Install HVAC': 'Install',
+
+  // Service
+  'Service - Old JT': 'Service',
+  'Diagnostic or Call Out - Residential HVAC': 'Service',
+  'Diagnostic or Call Out - Commercial HVAC': 'Service',
+  'Repair': 'Service',
+  'Workmanship Callback': 'Service',
+  'Warranty Repair': 'Service',
+  'Service Workmanship Callback': 'Service',
+  'Commercial Maintenance': 'Service',
+  'Imported Default JobType': 'Service',
+
+  // Maintenance
+  'Residential Maintenance 1 Piece': 'Maintenance',
+  'Residential Maintenance 2 piece': 'Maintenance',
+  'Residential Maintanance 2 Piece': 'Maintenance',
+  'Residential Membership Plan Visit': 'Maintenance',
+
+  // Ducts
+  'Residential Duct Cleaning': 'Ducts'
+
+  // EXCLUDED (no department):
+  // 'Sales Visit'
+  // 'Sales Follow Up'
+  // 'Install Workmanship Callback'
+  // 'Safety Inspection-IMP'
+};
+
+function classifyJob(j) {
+  var jt = (j.job_type || '').trim();
+  return JOB_TYPE_MAP[jt] || null; // null = excluded
+}
+
+// Persist targets in localStorage
 var TARGET_KEYS = ['tJobIns','tJobSvc','tJobMnt','tJobDct','tRevIns','tRevSvc','tRevMnt','tRevDct','tReviews','tPlans','tLeads'];
 
 function saveTargets() {
@@ -203,14 +244,6 @@ async function sbFetch(table, params) {
 function n(v) { var x = parseFloat(v); return isNaN(x) ? 0 : x; }
 function fmt(v) { return '$' + Math.round(v).toLocaleString('en-CA'); }
 
-function dept(j) {
-  var bu = (j.business_unit || '').toLowerCase();
-  if (bu.indexOf('install') >= 0 || bu.indexOf('sales') >= 0) return 'Install';
-  if (bu.indexOf('duct') >= 0) return 'Ducts';
-  if (bu.indexOf('maintenance') >= 0) return 'Maintenance';
-  return 'Service';
-}
-
 function wl(val, money) {
   var cls = val > 0 ? 'win' : val < 0 ? 'lose' : 'even';
   var sign = val > 0 ? '+' : '';
@@ -245,14 +278,31 @@ function render() {
   var t = getTargets();
   var deptNames = ['Install','Service','Maintenance','Ducts'];
 
-  // Today's actuals
+  // Today's jobs — classify using job_type mapping (matching Excel)
   var todayJobs = allJobs.filter(function(j) { return j.completion_date === date; });
   var actuals = { Install: { rev: 0, jobs: 0 }, Service: { rev: 0, jobs: 0 }, Maintenance: { rev: 0, jobs: 0 }, Ducts: { rev: 0, jobs: 0 } };
-  todayJobs.forEach(function(j) { var dp = dept(j); actuals[dp].rev += n(j.jobs_total_revenue); actuals[dp].jobs++; });
+  var excluded = 0;
 
-  // Goal actuals
-  var planSales = todayJobs.filter(function(j) { var jt = (j.job_type || '').toLowerCase(); return jt.indexOf('membership') >= 0 || jt.indexOf('plan') >= 0; }).length;
-  var leadsRun = todayJobs.filter(function(j) { var jt = (j.job_type || '').toLowerCase(); return jt.indexOf('sales visit') >= 0 || jt.indexOf('sales follow') >= 0; }).length;
+  todayJobs.forEach(function(j) {
+    var dp = classifyJob(j);
+    if (dp) {
+      actuals[dp].rev += n(j.jobs_total_revenue);
+      actuals[dp].jobs++;
+    } else {
+      excluded++;
+    }
+  });
+
+  // Goal actuals — counted from today's jobs by job_type name
+  var planSales = todayJobs.filter(function(j) {
+    var jt = (j.job_type || '').trim();
+    return jt === 'Residential Membership Plan Visit';
+  }).length;
+
+  var leadsRun = todayJobs.filter(function(j) {
+    var jt = (j.job_type || '').trim();
+    return jt === 'Sales Visit' || jt === 'Sales Follow Up';
+  }).length;
 
   var html = '';
 
@@ -288,6 +338,10 @@ function render() {
     html += '<tr><td class="name">' + g.name + '</td><td class="r">' + g.a + '</td><td class="r">' + g.t + '</td><td class="r">' + wl(g.a - g.t) + '</td><td>' + bar(g.a, g.t) + '</td></tr>';
   });
   html += '</table></div>';
+
+  // Status line
+  var counted = actuals.Install.jobs + actuals.Service.jobs + actuals.Maintenance.jobs + actuals.Ducts.jobs;
+  document.getElementById('status').textContent = allJobs.length + ' jobs loaded | ' + date + ': ' + todayJobs.length + ' total, ' + counted + ' counted, ' + excluded + ' excluded';
 
   document.getElementById('content').innerHTML = html;
 }
