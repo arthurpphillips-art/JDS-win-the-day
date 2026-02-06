@@ -7,11 +7,13 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <script>
     (function() {
+      if (sessionStorage.getItem('wtd_auth') === 'ok') return;
       var pwd = prompt('Password:');
       if (pwd !== 'jds2025') {
         document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#f472b6;font-family:DM Sans,sans-serif;">Access denied.</div>';
         throw new Error('denied');
       }
+      sessionStorage.setItem('wtd_auth', 'ok');
     })();
   </script>
   <style>
@@ -146,7 +148,7 @@ var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 var allJobs = [];
 
 // ========================================
-// JOB TYPE → DEPARTMENT MAPPING
+// JOB TYPE - DEPARTMENT MAPPING
 // Matches the Excel spreadsheet exactly.
 // Job types not listed here are EXCLUDED from counts.
 // ========================================
@@ -278,7 +280,7 @@ function render() {
   var t = getTargets();
   var deptNames = ['Install','Service','Maintenance','Ducts'];
 
-  // Today's jobs — classify using job_type mapping (matching Excel)
+  // Today's jobs - classify using job_type mapping (matching Excel)
   var todayJobs = allJobs.filter(function(j) { return j.completion_date === date; });
   var actuals = { Install: { rev: 0, jobs: 0 }, Service: { rev: 0, jobs: 0 }, Maintenance: { rev: 0, jobs: 0 }, Ducts: { rev: 0, jobs: 0 } };
   var excluded = 0;
@@ -293,7 +295,7 @@ function render() {
     }
   });
 
-  // Goal actuals — counted from today's jobs by job_type name
+  // Goal actuals - counted from today's jobs by job_type name
   var planSales = todayJobs.filter(function(j) {
     var jt = (j.job_type || '').trim();
     return jt === 'Residential Membership Plan Visit';
