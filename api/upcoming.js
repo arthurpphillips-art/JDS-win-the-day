@@ -154,24 +154,38 @@ export default async function handler(req, res) {
     const jobsMap = await batchFetchJobs(tenantId, headers, [...allJobIds]);
 
     // =============================================
-    // MULTI-DAY REVENUE ALLOCATION
-    // Count how many of our 3 days each job appears on.
-    // Revenue is split evenly across those days.
-    // e.g. a 3-day install at $30k = $10k per day
+    // APPOINTMENT-BASED REVENUE ALLOCATION
+    // Count how many appointments each job has per day
+    // and total across all days. Revenue is split
+    // proportionally by appointment count.
+    //
+    // e.g. $30k job with 2 appts on Day 1, 1 appt on Day 2:
+    //   Day 1: 2/3 * $30k = $20k
+    //   Day 2: 1/3 * $30k = $10k
     // =============================================
-    const jobDayCount = {}; // jobId -> number of days it appears in our window
-    dayJobIds.forEach(jobIds => {
-      jobIds.forEach(id => {
-        jobDayCount[id] = (jobDayCount[id] || 0) + 1;
+
+    // Count appointments per job per day, and total per job
+    // dayApptCounts[dayIndex] = { jobId: count }
+    const dayApptCounts = [];
+    const jobTotalAppts = {}; // jobId -> total appointment count across all days
+
+    allDayAppointments.forEach((appointments, dayIdx) => {
+      const counts = {};
+      appointments.forEach(a => {
+        if (!a.jobId) return;
+        counts[a.jobId] = (counts[a.jobId] || 0) + 1;
+        jobTotalAppts[a.jobId] = (jobTotalAppts[a.jobId] || 0) + 1;
       });
+      dayApptCounts.push(counts);
     });
 
-    // Track which jobs got split for debugging
+    // Track multi-day jobs for debugging
     const multiDayJobs = [];
 
     // Build day summaries with department breakdowns
     const days = businessDays.map((day, i) => {
       const jobIds = dayJobIds[i];
+      const apptCounts = dayApptCounts[i];
       const depts = { Install: { jobs: 0, rev: 0 }, Service: { jobs: 0, rev: 0 }, Maintenance: { jobs: 0, rev: 0 }, Ducts: { jobs: 0, rev: 0 } };
       let leadsRun = 0;
       let planSales = 0;
@@ -187,18 +201,22 @@ export default async function handler(req, res) {
         const dept = JOB_TYPE_MAP[jobTypeName] || null;
         const fullPreTaxRevenue = Math.round(((job.total || 0) / HST_RATE) * 100) / 100;
 
-        // Split revenue across the number of days this job spans
-        const numDays = jobDayCount[id] || 1;
-        const allocatedRevenue = Math.round((fullPreTaxRevenue / numDays) * 100) / 100;
+        // Split revenue by this day's appointment share
+        const dayAppts = apptCounts[id] || 1;
+        const totalAppts = jobTotalAppts[id] || 1;
+        const allocatedRevenue = Math.round((fullPreTaxRevenue * dayAppts / totalAppts) * 100) / 100;
 
-        // Track multi-day jobs for debugging (only on first day)
-        if (numDays > 1 && i === 0) {
+        // Track multi-day jobs for debugging (only log once on first day seen)
+        if (totalAppts > 1 && i === 0 && apptCounts[id]) {
           multiDayJobs.push({
             jobId: id,
             jobType: jobTypeName,
             fullRevenue: fullPreTaxRevenue,
-            daysSpanned: numDays,
-            dailyAllocation: allocatedRevenue
+            totalAppointments: totalAppts,
+            dayBreakdown: dayApptCounts.map((dc, di) => ({
+              day: toDateStr(businessDays[di]),
+              appointments: dc[id] || 0
+            })).filter(d => d.appointments > 0)
           });
         }
 
