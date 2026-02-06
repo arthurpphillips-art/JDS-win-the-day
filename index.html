@@ -31,7 +31,7 @@
     }
     * { margin:0; padding:0; box-sizing:border-box; }
     body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding:32px; }
-    .page { max-width:700px; margin:0 auto; }
+    .page { max-width:900px; margin:0 auto; }
 
     h1 { font-size:20px; font-weight:600; margin-bottom:24px; display:flex; align-items:center; gap:10px; }
     h1 span { font-size:12px; color:var(--muted); font-weight:400; }
@@ -48,9 +48,11 @@
     table { width:100%; border-collapse:collapse; }
     th { text-align:left; padding:8px 10px; font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--dim); border-bottom:1px solid var(--border); }
     th.r { text-align:right; }
+    th.c { text-align:center; }
     td { padding:8px 10px; font-family:'JetBrains Mono',monospace; font-size:13px; border-bottom:1px solid rgba(42,42,58,.4); }
     td.name { font-family:'DM Sans',sans-serif; font-weight:500; }
     td.r { text-align:right; }
+    td.c { text-align:center; }
     tr:last-child td { border-bottom:none; }
 
     .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:16px; }
@@ -92,53 +94,232 @@
     .targets-grid input[type="number"] { width:100%; }
 
     #status { font-size:11px; color:var(--dim); margin-bottom:16px; }
+
+    /* 3-Day Forecast styles */
+    .forecast-header {
+      font-size:16px;
+      font-weight:600;
+      margin-bottom:16px;
+      margin-top:32px;
+      display:flex;
+      align-items:center;
+      gap:8px;
+      color:var(--text);
+    }
+    .forecast-header .badge {
+      font-size:10px;
+      font-weight:500;
+      background:rgba(77,124,255,.15);
+      color:var(--blue);
+      padding:3px 8px;
+      border-radius:6px;
+      text-transform:uppercase;
+      letter-spacing:.5px;
+    }
+    .forecast-note {
+      font-size:11px;
+      color:var(--dim);
+      margin-bottom:16px;
+      line-height:1.5;
+    }
+
+    /* Forecast table with day columns */
+    .forecast-table th.day-col {
+      text-align:center;
+      min-width:120px;
+    }
+    .forecast-table td.day-cell {
+      text-align:center;
+      font-size:12px;
+      line-height:1.5;
+    }
+    .forecast-table td.day-cell .val {
+      font-family:'JetBrains Mono',monospace;
+      font-size:13px;
+    }
+    .forecast-table td.day-cell .vs {
+      font-size:10px;
+      color:var(--dim);
+    }
+    .forecast-table td.day-cell .wl {
+      font-size:11px;
+      font-weight:600;
+    }
+    .forecast-table td.dept-name {
+      font-family:'DM Sans',sans-serif;
+      font-weight:500;
+      font-size:13px;
+    }
+    .forecast-table td.dept-name .target-hint {
+      display:block;
+      font-size:10px;
+      color:var(--dim);
+      font-weight:400;
+    }
+
+    .spinner-sm {
+      display:inline-block;
+      width:14px; height:14px;
+      border:2px solid rgba(255,255,255,.1);
+      border-top-color:var(--blue);
+      border-radius:50%;
+      animation:spin .6s linear infinite;
+    }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* Divider */
+    .section-divider {
+      border:none;
+      border-top:1px solid var(--border);
+      margin:32px 0;
+    }
+
+    /* Tab controls */
+    .tab-bar {
+      display:flex;
+      gap:4px;
+      margin-bottom:24px;
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:4px;
+    }
+    .tab-btn {
+      flex:1;
+      padding:8px 16px;
+      border:none;
+      background:transparent;
+      color:var(--muted);
+      font-family:'DM Sans',sans-serif;
+      font-size:13px;
+      font-weight:500;
+      border-radius:7px;
+      cursor:pointer;
+      transition:all .2s;
+    }
+    .tab-btn:hover { color:var(--text); }
+    .tab-btn.active {
+      background:rgba(77,124,255,.12);
+      color:var(--blue);
+    }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
   </style>
 </head>
 <body>
 <div class="page">
   <h1>Win the Day <span>Daily Scorecard</span></h1>
 
-  <div class="controls">
-    <div class="field">
-      <label>Date</label>
-      <input type="date" id="pickDate" onchange="render()">
+  <!-- Tab Navigation -->
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('forecast')">📅 3-Day Forecast</button>
+    <button class="tab-btn" onclick="switchTab('daily')">🏆 Daily Scorecard</button>
+  </div>
+
+  <!-- ===================== 3-DAY FORECAST TAB ===================== -->
+  <div class="tab-panel active" id="tab-forecast">
+    <div class="forecast-header">📅 3-Day Forecast <span class="badge">Live from ServiceTitan</span></div>
+    <div class="forecast-note" id="forecastStatus">Loading scheduled jobs from ServiceTitan...</div>
+
+    <!-- Jobs Forecast -->
+    <div class="card">
+      <div class="section-label">Jobs Scheduled</div>
+      <table class="forecast-table">
+        <thead>
+          <tr>
+            <th style="width:140px;">Department</th>
+            <th class="day-col" id="fjHead1">Day 1</th>
+            <th class="day-col" id="fjHead2">Day 2</th>
+            <th class="day-col" id="fjHead3">Day 3</th>
+          </tr>
+        </thead>
+        <tbody id="forecastJobsBody">
+          <tr><td colspan="4" style="text-align:center;color:var(--dim);padding:16px;"><div class="spinner-sm"></div> Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Revenue Forecast -->
+    <div class="card">
+      <div class="section-label">Revenue (Pre-Tax)</div>
+      <table class="forecast-table">
+        <thead>
+          <tr>
+            <th style="width:140px;">Department</th>
+            <th class="day-col" id="frHead1">Day 1</th>
+            <th class="day-col" id="frHead2">Day 2</th>
+            <th class="day-col" id="frHead3">Day 3</th>
+          </tr>
+        </thead>
+        <tbody id="forecastRevBody">
+          <tr><td colspan="4" style="text-align:center;color:var(--dim);padding:16px;"><div class="spinner-sm"></div> Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Other Goals Forecast -->
+    <div class="card">
+      <div class="section-label">Other Goals</div>
+      <table class="forecast-table">
+        <thead>
+          <tr>
+            <th style="width:140px;">Goal</th>
+            <th class="day-col" id="fgHead1">Day 1</th>
+            <th class="day-col" id="fgHead2">Day 2</th>
+            <th class="day-col" id="fgHead3">Day 3</th>
+          </tr>
+        </thead>
+        <tbody id="forecastGoalsBody">
+          <tr><td colspan="4" style="text-align:center;color:var(--dim);padding:16px;"><div class="spinner-sm"></div> Loading...</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 
-  <!-- Targets Settings -->
-  <div class="toggle" id="tgtToggle" onclick="togglePanel('tgt')">&#9656; Set Targets</div>
-  <div class="collapsible" id="tgt">
-    <div class="card" style="margin-bottom:16px;">
-      <div class="section-label" style="margin-bottom:10px;">Daily Job Targets</div>
-      <div class="targets-grid">
-        <div class="tg-header"></div><div class="tg-header">Target</div><div></div>
-        <div class="tg-label">Installs</div><input type="number" id="tJobIns" value="2.5" step="0.1" onchange="saveTargets(); render()"><div></div>
-        <div class="tg-label">Service</div><input type="number" id="tJobSvc" value="16" step="1" onchange="saveTargets(); render()"><div></div>
-        <div class="tg-label">Maintenance</div><input type="number" id="tJobMnt" value="7" step="1" onchange="saveTargets(); render()"><div></div>
-        <div class="tg-label">Ducts</div><input type="number" id="tJobDct" value="0.5" step="0.1" onchange="saveTargets(); render()"><div></div>
-      </div>
-
-      <div class="section-label" style="margin-bottom:10px;">Daily Revenue Targets ($)</div>
-      <div class="targets-grid">
-        <div class="tg-header"></div><div class="tg-header">Target</div><div></div>
-        <div class="tg-label">Installs</div><input type="number" id="tRevIns" value="16358" step="100" onchange="saveTargets(); render()"><div></div>
-        <div class="tg-label">Service</div><input type="number" id="tRevSvc" value="3729" step="100" onchange="saveTargets(); render()"><div></div>
-        <div class="tg-label">Maintenance</div><input type="number" id="tRevMnt" value="917" step="100" onchange="saveTargets(); render()"><div></div>
-        <div class="tg-label">Ducts</div><input type="number" id="tRevDct" value="418" step="100" onchange="saveTargets(); render()"><div></div>
-      </div>
-
-      <div class="section-label" style="margin-bottom:10px;">Other Goal Targets</div>
-      <div class="targets-grid">
-        <div class="tg-header"></div><div class="tg-header">Target</div><div></div>
-        <div class="tg-label">Google Reviews</div><input type="number" id="tReviews" value="3" onchange="saveTargets(); render()"><div></div>
-        <div class="tg-label">Plan Sales</div><input type="number" id="tPlans" value="3" onchange="saveTargets(); render()"><div></div>
-        <div class="tg-label">Leads Run</div><input type="number" id="tLeads" value="4" onchange="saveTargets(); render()"><div></div>
+  <!-- ===================== DAILY SCORECARD TAB ===================== -->
+  <div class="tab-panel" id="tab-daily">
+    <div class="controls">
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="pickDate" onchange="render()">
       </div>
     </div>
-  </div>
 
-  <div id="status">Loading...</div>
-  <div id="content"></div>
+    <!-- Targets Settings -->
+    <div class="toggle" id="tgtToggle" onclick="togglePanel('tgt')">&#9656; Set Targets</div>
+    <div class="collapsible" id="tgt">
+      <div class="card" style="margin-bottom:16px;">
+        <div class="section-label" style="margin-bottom:10px;">Daily Job Targets</div>
+        <div class="targets-grid">
+          <div class="tg-header"></div><div class="tg-header">Target</div><div></div>
+          <div class="tg-label">Installs</div><input type="number" id="tJobIns" value="2.5" step="0.1" onchange="saveTargets(); render()"><div></div>
+          <div class="tg-label">Service</div><input type="number" id="tJobSvc" value="16" step="1" onchange="saveTargets(); render()"><div></div>
+          <div class="tg-label">Maintenance</div><input type="number" id="tJobMnt" value="7" step="1" onchange="saveTargets(); render()"><div></div>
+          <div class="tg-label">Ducts</div><input type="number" id="tJobDct" value="0.5" step="0.1" onchange="saveTargets(); render()"><div></div>
+        </div>
+
+        <div class="section-label" style="margin-bottom:10px;">Daily Revenue Targets ($)</div>
+        <div class="targets-grid">
+          <div class="tg-header"></div><div class="tg-header">Target</div><div></div>
+          <div class="tg-label">Installs</div><input type="number" id="tRevIns" value="16358" step="100" onchange="saveTargets(); render()"><div></div>
+          <div class="tg-label">Service</div><input type="number" id="tRevSvc" value="3729" step="100" onchange="saveTargets(); render()"><div></div>
+          <div class="tg-label">Maintenance</div><input type="number" id="tRevMnt" value="917" step="100" onchange="saveTargets(); render()"><div></div>
+          <div class="tg-label">Ducts</div><input type="number" id="tRevDct" value="418" step="100" onchange="saveTargets(); render()"><div></div>
+        </div>
+
+        <div class="section-label" style="margin-bottom:10px;">Other Goal Targets</div>
+        <div class="targets-grid">
+          <div class="tg-header"></div><div class="tg-header">Target</div><div></div>
+          <div class="tg-label">Google Reviews</div><input type="number" id="tReviews" value="3" onchange="saveTargets(); render()"><div></div>
+          <div class="tg-label">Plan Sales</div><input type="number" id="tPlans" value="3" onchange="saveTargets(); render()"><div></div>
+          <div class="tg-label">Leads Run</div><input type="number" id="tLeads" value="4" onchange="saveTargets(); render()"><div></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="status">Loading...</div>
+    <div id="content"></div>
+  </div>
 </div>
 
 <script>
@@ -149,14 +330,9 @@ var allJobs = [];
 
 // ========================================
 // JOB TYPE - DEPARTMENT MAPPING
-// Matches the Excel spreadsheet exactly.
-// Job types not listed here are EXCLUDED from counts.
 // ========================================
 var JOB_TYPE_MAP = {
-  // Install
   'Install HVAC': 'Install',
-
-  // Service
   'Service - Old JT': 'Service',
   'Diagnostic or Call Out - Residential HVAC': 'Service',
   'Diagnostic or Call Out - Commercial HVAC': 'Service',
@@ -166,36 +342,23 @@ var JOB_TYPE_MAP = {
   'Service Workmanship Callback': 'Service',
   'Commercial Maintenance': 'Service',
   'Imported Default JobType': 'Service',
-
-  // Maintenance
   'Residential Maintenance 1 Piece': 'Maintenance',
   'Residential Maintenance 2 piece': 'Maintenance',
   'Residential Maintanance 2 Piece': 'Maintenance',
   'Residential Membership Plan Visit': 'Maintenance',
-
-  // Ducts
   'Residential Duct Cleaning': 'Ducts'
-
-  // EXCLUDED (no department):
-  // 'Sales Visit'
-  // 'Sales Follow Up'
-  // 'Install Workmanship Callback'
-  // 'Safety Inspection-IMP'
 };
 
 function classifyJob(j) {
   var jt = (j.job_type || '').trim();
-  return JOB_TYPE_MAP[jt] || null; // null = excluded
+  return JOB_TYPE_MAP[jt] || null;
 }
 
-// Get the date portion from a completion_date value
-// Handles: "2026-02-05", "2026-02-05T14:30:00", "2026-02-05T14:30:00+00:00" etc.
 function dateOf(val) {
   if (!val) return '';
   return String(val).substring(0, 10);
 }
 
-// Get today's date in LOCAL time (not UTC)
 function localToday() {
   var d = new Date();
   var y = d.getFullYear();
@@ -204,7 +367,9 @@ function localToday() {
   return y + '-' + m + '-' + day;
 }
 
-// Persist targets in localStorage
+// ========================================
+// TARGETS
+// ========================================
 var TARGET_KEYS = ['tJobIns','tJobSvc','tJobMnt','tJobDct','tRevIns','tRevSvc','tRevMnt','tRevDct','tReviews','tPlans','tLeads'];
 
 function saveTargets() {
@@ -276,14 +441,131 @@ function bar(actual, target) {
   return '<div class="bar"><div class="bar-fill ' + c + '" style="width:' + pct + '%"></div></div>';
 }
 
+// ========================================
+// TAB SWITCHING
+// ========================================
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(function(btn, i) {
+    btn.classList.toggle('active', (tab === 'forecast' && i === 0) || (tab === 'daily' && i === 1));
+  });
+  document.getElementById('tab-forecast').classList.toggle('active', tab === 'forecast');
+  document.getElementById('tab-daily').classList.toggle('active', tab === 'daily');
+}
+
+// ========================================
+// 3-DAY FORECAST
+// ========================================
+async function loadForecast() {
+  try {
+    var response = await fetch('/api/upcoming');
+    if (!response.ok) throw new Error('API returned ' + response.status);
+    var data = await response.json();
+    if (!data.success) throw new Error(data.error || 'Unknown error');
+    renderForecast(data.days);
+  } catch(e) {
+    document.getElementById('forecastStatus').textContent = 'Failed to load forecast: ' + e.message;
+    document.getElementById('forecastJobsBody').innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--rose);padding:16px;">Error loading data</td></tr>';
+    document.getElementById('forecastRevBody').innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--rose);padding:16px;">Error loading data</td></tr>';
+    document.getElementById('forecastGoalsBody').innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--rose);padding:16px;">Error loading data</td></tr>';
+  }
+}
+
+function renderForecast(days) {
+  var t = getTargets();
+  var deptNames = ['Install', 'Service', 'Maintenance', 'Ducts'];
+
+  // Set column headers
+  days.forEach(function(day, i) {
+    document.getElementById('fjHead' + (i+1)).textContent = day.label;
+    document.getElementById('frHead' + (i+1)).textContent = day.label;
+    document.getElementById('fgHead' + (i+1)).textContent = day.label;
+  });
+
+  // Jobs table
+  var jobsHtml = '';
+  deptNames.forEach(function(dept) {
+    jobsHtml += '<tr><td class="dept-name">' + dept + '<span class="target-hint">Target: ' + t.jobs[dept] + '</span></td>';
+    days.forEach(function(day) {
+      var actual = day.departments[dept].jobs;
+      var target = t.jobs[dept];
+      var diff = actual - target;
+      var cls = diff > 0 ? 'win' : diff < 0 ? 'lose' : 'even';
+      jobsHtml += '<td class="day-cell"><div class="val">' + actual + '</div>' + bar(actual, target) + '<div class="wl ' + cls + '">' + (diff > 0 ? '+' : '') + (Math.round(diff*10)/10) + '</div></td>';
+    });
+    jobsHtml += '</tr>';
+  });
+  // Total row
+  jobsHtml += '<tr style="border-top:1px solid var(--border);"><td class="dept-name" style="color:var(--muted);">Total</td>';
+  days.forEach(function(day) {
+    jobsHtml += '<td class="day-cell"><div class="val" style="color:var(--muted);">' + day.totalJobs + '</div></td>';
+  });
+  jobsHtml += '</tr>';
+  document.getElementById('forecastJobsBody').innerHTML = jobsHtml;
+
+  // Revenue table
+  var revHtml = '';
+  deptNames.forEach(function(dept) {
+    revHtml += '<tr><td class="dept-name">' + dept + '<span class="target-hint">Target: ' + fmt(t.rev[dept]) + '</span></td>';
+    days.forEach(function(day) {
+      var actual = day.departments[dept].rev;
+      var target = t.rev[dept];
+      var diff = actual - target;
+      var cls = diff > 0 ? 'win' : diff < 0 ? 'lose' : 'even';
+      revHtml += '<td class="day-cell"><div class="val">' + fmt(actual) + '</div>' + bar(actual, target) + '<div class="wl ' + cls + '">' + (diff > 0 ? '+' : '') + fmt(diff) + '</div></td>';
+    });
+    revHtml += '</tr>';
+  });
+  // Total row
+  revHtml += '<tr style="border-top:1px solid var(--border);"><td class="dept-name" style="color:var(--muted);">Total</td>';
+  days.forEach(function(day) {
+    revHtml += '<td class="day-cell"><div class="val" style="color:var(--muted);">' + fmt(day.totalRevenue) + '</div></td>';
+  });
+  revHtml += '</tr>';
+  document.getElementById('forecastRevBody').innerHTML = revHtml;
+
+  // Other Goals table
+  var goalsHtml = '';
+  var goalRows = [
+    { name: 'Google Reviews', key: 'reviews', getActual: function() { return 0; } },
+    { name: 'Plan Sales', key: 'plans', getActual: function(day) { return day.planSales; } },
+    { name: 'Leads Run', key: 'leads', getActual: function(day) { return day.leadsRun; } }
+  ];
+  goalRows.forEach(function(goal) {
+    var target = t[goal.key];
+    goalsHtml += '<tr><td class="dept-name">' + goal.name + '<span class="target-hint">Target: ' + target + '</span></td>';
+    days.forEach(function(day) {
+      var actual = goal.getActual(day);
+      var diff = actual - target;
+      var cls = diff > 0 ? 'win' : diff < 0 ? 'lose' : 'even';
+      if (goal.key === 'reviews') {
+        goalsHtml += '<td class="day-cell"><div class="val" style="color:var(--dim);">—</div><div style="font-size:10px;color:var(--dim);">Manual</div></td>';
+      } else {
+        goalsHtml += '<td class="day-cell"><div class="val">' + actual + '</div>' + bar(actual, target) + '<div class="wl ' + cls + '">' + (diff > 0 ? '+' : '') + (Math.round(diff*10)/10) + '</div></td>';
+      }
+    });
+    goalsHtml += '</tr>';
+  });
+  document.getElementById('forecastGoalsBody').innerHTML = goalsHtml;
+
+  // Update status
+  var ts = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  var note = 'Showing scheduled appointments for ' + days.map(function(d) { return d.label; }).join(', ') + '. Updated at ' + ts + '.';
+  var futureNote = days.some(function(d) { return !d.isToday; }) ? ' Future days show scheduled jobs — revenue may update after completion.' : '';
+  document.getElementById('forecastStatus').textContent = note + futureNote;
+}
+
+// ========================================
+// DAILY SCORECARD (existing)
+// ========================================
 async function init() {
   loadTargets();
   document.getElementById('pickDate').value = localToday();
 
+  // Load forecast in parallel
+  loadForecast();
+
   try {
     allJobs = await sbFetch('completed_jobs_public', { order: 'completion_date.desc', limit: '10000', job_id: 'not.is.null' });
-
-    // Show latest date in data for debugging
     var latestDate = allJobs.length > 0 ? allJobs[0].completion_date : 'none';
     document.getElementById('status').textContent = allJobs.length + ' jobs loaded | latest in data: ' + latestDate;
     render();
@@ -299,7 +581,6 @@ function render() {
   var t = getTargets();
   var deptNames = ['Install','Service','Maintenance','Ducts'];
 
-  // Today's jobs - use dateOf() to handle datetime formats
   var todayJobs = allJobs.filter(function(j) { return dateOf(j.completion_date) === date; });
   var actuals = { Install: { rev: 0, jobs: 0 }, Service: { rev: 0, jobs: 0 }, Maintenance: { rev: 0, jobs: 0 }, Ducts: { rev: 0, jobs: 0 } };
   var excluded = 0;
@@ -314,7 +595,6 @@ function render() {
     }
   });
 
-  // Goal actuals
   var planSales = todayJobs.filter(function(j) {
     var jt = (j.job_type || '').trim();
     return jt === 'Residential Membership Plan Visit';
@@ -360,7 +640,6 @@ function render() {
   });
   html += '</table></div>';
 
-  // Status line
   var counted = actuals.Install.jobs + actuals.Service.jobs + actuals.Maintenance.jobs + actuals.Ducts.jobs;
   var latestDate = allJobs.length > 0 ? allJobs[0].completion_date : 'none';
   document.getElementById('status').textContent = allJobs.length + ' jobs | latest: ' + latestDate + ' | ' + date + ': ' + todayJobs.length + ' total, ' + counted + ' counted, ' + excluded + ' excluded';
