@@ -7,13 +7,13 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <script>
     (function() {
-      if (sessionStorage.getItem('wtd_auth') === 'ok') return;
+      if (localStorage.getItem('wtd_auth') === 'ok') return;
       var pwd = prompt('Password:');
       if (pwd !== 'jds2025') {
         document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#f472b6;font-family:DM Sans,sans-serif;">Access denied.</div>';
         throw new Error('denied');
       }
-      sessionStorage.setItem('wtd_auth', 'ok');
+      localStorage.setItem('wtd_auth', 'ok');
     })();
   </script>
   <style>
