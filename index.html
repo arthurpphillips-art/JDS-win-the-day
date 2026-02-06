@@ -7,7 +7,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <script>
     (function() {
-      const pwd = prompt('Password:');
+      var pwd = prompt('Password:');
       if (pwd !== 'jds2025') {
         document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#f472b6;font-family:DM Sans,sans-serif;">Access denied.</div>';
         throw new Error('denied');
@@ -37,11 +37,10 @@
     .controls { display:flex; gap:12px; align-items:flex-end; margin-bottom:24px; flex-wrap:wrap; }
     .field { display:flex; flex-direction:column; gap:4px; }
     .field label { font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--dim); }
-    input, select { padding:7px 10px; background:var(--card); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:inherit; font-size:13px; outline:none; }
+    input { padding:7px 10px; background:var(--card); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:inherit; font-size:13px; outline:none; }
     input:focus { border-color:var(--blue); }
-    input[type="number"] { width:80px; font-family:'JetBrains Mono',monospace; font-size:12px; }
+    input[type="number"] { width:90px; font-family:'JetBrains Mono',monospace; font-size:12px; }
 
-    .section { margin-bottom:20px; }
     .section-label { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin-bottom:8px; }
 
     table { width:100%; border-collapse:collapse; }
@@ -64,10 +63,31 @@
     .bar-fill.a { background:var(--amber); }
     .bar-fill.r { background:var(--rose); }
 
-    .settings-toggle { cursor:pointer; font-size:12px; color:var(--dim); margin-bottom:12px; user-select:none; }
-    .settings-toggle:hover { color:var(--muted); }
-    .settings-body { display:none; }
-    .settings-body.open { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:16px; }
+    .toggle { cursor:pointer; font-size:12px; color:var(--dim); margin-bottom:12px; user-select:none; }
+    .toggle:hover { color:var(--muted); }
+    .collapsible { display:none; }
+    .collapsible.open { display:block; }
+
+    .targets-grid {
+      display:grid;
+      grid-template-columns: auto 1fr 1fr;
+      gap: 6px 12px;
+      align-items:center;
+      margin-bottom:12px;
+    }
+    .targets-grid .tg-label {
+      font-size:12px;
+      color:var(--muted);
+      font-weight:500;
+    }
+    .targets-grid .tg-header {
+      font-size:10px;
+      text-transform:uppercase;
+      letter-spacing:.5px;
+      color:var(--dim);
+      padding-bottom:4px;
+    }
+    .targets-grid input[type="number"] { width:100%; }
 
     #status { font-size:11px; color:var(--dim); margin-bottom:16px; }
   </style>
@@ -83,17 +103,36 @@
     </div>
   </div>
 
-  <div class="settings-toggle" id="stgToggle" onclick="toggleSettings()">&#9881; Settings &#9656;</div>
-  <div class="settings-body" id="stg">
-    <div class="field"><label>GM %</label><input type="number" id="gm" value="42" onchange="render()"></div>
-    <div class="field"><label>Monthly Opex</label><input type="number" id="opex" value="135000" step="1000" onchange="render()"></div>
-    <div class="field"><label>Work Days/Mo</label><input type="number" id="wdays" value="20" onchange="render()"></div>
-    <div class="field"><label>Install Trucks</label><input type="number" id="tIns" value="2" onchange="render()"></div>
-    <div class="field"><label>Service Trucks</label><input type="number" id="tSvc" value="4" onchange="render()"></div>
-    <div class="field"><label>Maint Trucks</label><input type="number" id="tMnt" value="3" onchange="render()"></div>
-    <div class="field"><label>Duct Trucks</label><input type="number" id="tDct" value="1" onchange="render()"></div>
-    <div class="field"><label>Google Rev Target</label><input type="number" id="tReviews" value="3" onchange="render()"></div>
-    <div class="field"><label>Plan Sales Target</label><input type="number" id="tPlans" value="3" onchange="render()"></div>
+  <!-- Targets Settings -->
+  <div class="toggle" id="tgtToggle" onclick="togglePanel('tgt')">&#9656; Set Targets</div>
+  <div class="collapsible" id="tgt">
+    <div class="card" style="margin-bottom:16px;">
+      <div class="section-label" style="margin-bottom:10px;">Daily Job Targets</div>
+      <div class="targets-grid">
+        <div class="tg-header"></div><div class="tg-header">Target</div><div></div>
+        <div class="tg-label">Installs</div><input type="number" id="tJobIns" value="2.5" step="0.1" onchange="saveTargets(); render()"><div></div>
+        <div class="tg-label">Service</div><input type="number" id="tJobSvc" value="16" step="1" onchange="saveTargets(); render()"><div></div>
+        <div class="tg-label">Maintenance</div><input type="number" id="tJobMnt" value="7" step="1" onchange="saveTargets(); render()"><div></div>
+        <div class="tg-label">Ducts</div><input type="number" id="tJobDct" value="0.5" step="0.1" onchange="saveTargets(); render()"><div></div>
+      </div>
+
+      <div class="section-label" style="margin-bottom:10px;">Daily Revenue Targets ($)</div>
+      <div class="targets-grid">
+        <div class="tg-header"></div><div class="tg-header">Target</div><div></div>
+        <div class="tg-label">Installs</div><input type="number" id="tRevIns" value="16358" step="100" onchange="saveTargets(); render()"><div></div>
+        <div class="tg-label">Service</div><input type="number" id="tRevSvc" value="3729" step="100" onchange="saveTargets(); render()"><div></div>
+        <div class="tg-label">Maintenance</div><input type="number" id="tRevMnt" value="917" step="100" onchange="saveTargets(); render()"><div></div>
+        <div class="tg-label">Ducts</div><input type="number" id="tRevDct" value="418" step="100" onchange="saveTargets(); render()"><div></div>
+      </div>
+
+      <div class="section-label" style="margin-bottom:10px;">Other Goal Targets</div>
+      <div class="targets-grid">
+        <div class="tg-header"></div><div class="tg-header">Target</div><div></div>
+        <div class="tg-label">Google Reviews</div><input type="number" id="tReviews" value="3" onchange="saveTargets(); render()"><div></div>
+        <div class="tg-label">Plan Sales</div><input type="number" id="tPlans" value="3" onchange="saveTargets(); render()"><div></div>
+        <div class="tg-label">Leads Run</div><input type="number" id="tLeads" value="4" onchange="saveTargets(); render()"><div></div>
+      </div>
+    </div>
   </div>
 
   <div id="status">Loading...</div>
@@ -105,13 +144,52 @@ var SB_URL = 'https://yquqqfqtrozpcxwkvvmf.supabase.co';
 var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlxdXFxZnF0cm96cGN4d2t2dm1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODMzNDgsImV4cCI6MjA4NDE1OTM0OH0.VjsmiyU5EXCrFXIzMsnO-3q1zkBekqhoErOyvbKhM8s';
 
 var allJobs = [];
-var allOpps = [];
-var settingsOpen = false;
 
-function toggleSettings() {
-  settingsOpen = !settingsOpen;
-  document.getElementById('stg').classList.toggle('open', settingsOpen);
-  document.getElementById('stgToggle').innerHTML = settingsOpen ? '&#9881; Settings &#9662;' : '&#9881; Settings &#9656;';
+// Persist targets in localStorage so they survive refreshes
+var TARGET_KEYS = ['tJobIns','tJobSvc','tJobMnt','tJobDct','tRevIns','tRevSvc','tRevMnt','tRevDct','tReviews','tPlans','tLeads'];
+
+function saveTargets() {
+  var data = {};
+  TARGET_KEYS.forEach(function(k) { data[k] = document.getElementById(k).value; });
+  try { localStorage.setItem('wtd_targets', JSON.stringify(data)); } catch(e) {}
+}
+
+function loadTargets() {
+  try {
+    var saved = JSON.parse(localStorage.getItem('wtd_targets'));
+    if (saved) {
+      TARGET_KEYS.forEach(function(k) {
+        if (saved[k] !== undefined) document.getElementById(k).value = saved[k];
+      });
+    }
+  } catch(e) {}
+}
+
+function togglePanel(id) {
+  var el = document.getElementById(id);
+  var tog = document.getElementById(id + 'Toggle');
+  var open = el.classList.toggle('open');
+  tog.innerHTML = (open ? '&#9662;' : '&#9656;') + ' Set Targets';
+}
+
+function getTargets() {
+  return {
+    jobs: {
+      Install: parseFloat(document.getElementById('tJobIns').value) || 0,
+      Service: parseFloat(document.getElementById('tJobSvc').value) || 0,
+      Maintenance: parseFloat(document.getElementById('tJobMnt').value) || 0,
+      Ducts: parseFloat(document.getElementById('tJobDct').value) || 0
+    },
+    rev: {
+      Install: parseFloat(document.getElementById('tRevIns').value) || 0,
+      Service: parseFloat(document.getElementById('tRevSvc').value) || 0,
+      Maintenance: parseFloat(document.getElementById('tRevMnt').value) || 0,
+      Ducts: parseFloat(document.getElementById('tRevDct').value) || 0
+    },
+    reviews: parseFloat(document.getElementById('tReviews').value) || 0,
+    plans: parseFloat(document.getElementById('tPlans').value) || 0,
+    leads: parseFloat(document.getElementById('tLeads').value) || 0
+  };
 }
 
 async function sbFetch(table, params) {
@@ -148,16 +226,11 @@ function bar(actual, target) {
 }
 
 async function init() {
-  var today = new Date().toISOString().split('T')[0];
-  document.getElementById('pickDate').value = today;
+  loadTargets();
+  document.getElementById('pickDate').value = new Date().toISOString().split('T')[0];
 
   try {
-    var results = await Promise.all([
-      sbFetch('completed_jobs_public', { order: 'completion_date.desc', limit: '10000', job_id: 'not.is.null' }),
-      sbFetch('opportunities_estimates', { order: 'creation_date.desc', limit: '5000' })
-    ]);
-    allJobs = results[0];
-    allOpps = results[1];
+    allJobs = await sbFetch('completed_jobs_public', { order: 'completion_date.desc', limit: '10000', job_id: 'not.is.null' });
     document.getElementById('status').textContent = allJobs.length + ' jobs loaded';
     render();
   } catch(e) {
@@ -169,81 +242,52 @@ function render() {
   var date = document.getElementById('pickDate').value;
   if (!date || !allJobs.length) return;
 
-  var d = new Date(date + 'T00:00:00');
-  var monthStart = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
-  var monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0];
-
-  var wdays = parseInt(document.getElementById('wdays').value);
-
-  // Month-to-date totals for target calculation
-  var mtdJobs = allJobs.filter(function(j) { return j.completion_date && j.completion_date >= monthStart && j.completion_date <= monthEnd; });
-  var depts = { Install: { rev: 0, jobs: 0 }, Service: { rev: 0, jobs: 0 }, Maintenance: { rev: 0, jobs: 0 }, Ducts: { rev: 0, jobs: 0 } };
-  mtdJobs.forEach(function(j) { var dp = dept(j); depts[dp].rev += n(j.jobs_total_revenue); depts[dp].jobs++; });
-
-  // Daily targets from MTD (RPD = Revenue / Working Days, Jobs/Day = RPD / Avg Job)
-  var targets = {};
+  var t = getTargets();
   var deptNames = ['Install','Service','Maintenance','Ducts'];
-  deptNames.forEach(function(dp) {
-    var rpd = wdays > 0 ? depts[dp].rev / wdays : 0;
-    var avgJob = depts[dp].jobs > 0 ? depts[dp].rev / depts[dp].jobs : 0;
-    var jobsPerDay = avgJob > 0 ? rpd / avgJob : 0;
-    targets[dp] = { rpd: rpd, jobsPerDay: jobsPerDay };
-  });
-
-  // RPL for leads target
-  var salesUnits = ['hvac - sales', 'hvac - install', 'sales - old bu'];
-  var monthOpps = allOpps.filter(function(o) {
-    var od = o.creation_date || o.sold_date;
-    return od && od >= monthStart && od <= monthEnd && o.opportunity_status && salesUnits.indexOf((o.business_unit || '').toLowerCase()) >= 0 && n(o.estimate_subtotal) > 0;
-  });
-  var oppSet = {};
-  monthOpps.forEach(function(o) { oppSet[o.opportunity_number || o.estimate_id] = true; });
-  var totalOpps = Object.keys(oppSet).length;
-  var rpl = totalOpps > 0 ? depts.Install.rev / totalOpps : 0;
 
   // Today's actuals
   var todayJobs = allJobs.filter(function(j) { return j.completion_date === date; });
-  var todayDepts = { Install: { rev: 0, jobs: 0 }, Service: { rev: 0, jobs: 0 }, Maintenance: { rev: 0, jobs: 0 }, Ducts: { rev: 0, jobs: 0 } };
-  todayJobs.forEach(function(j) { var dp = dept(j); todayDepts[dp].rev += n(j.jobs_total_revenue); todayDepts[dp].jobs++; });
+  var actuals = { Install: { rev: 0, jobs: 0 }, Service: { rev: 0, jobs: 0 }, Maintenance: { rev: 0, jobs: 0 }, Ducts: { rev: 0, jobs: 0 } };
+  todayJobs.forEach(function(j) { var dp = dept(j); actuals[dp].rev += n(j.jobs_total_revenue); actuals[dp].jobs++; });
 
+  // Goal actuals
   var planSales = todayJobs.filter(function(j) { var jt = (j.job_type || '').toLowerCase(); return jt.indexOf('membership') >= 0 || jt.indexOf('plan') >= 0; }).length;
   var leadsRun = todayJobs.filter(function(j) { var jt = (j.job_type || '').toLowerCase(); return jt.indexOf('sales visit') >= 0 || jt.indexOf('sales follow') >= 0; }).length;
-  var leadsTarget = rpl > 0 ? Math.round(targets.Install.rpd / rpl) : 4;
 
   var html = '';
 
   // Jobs
-  html += '<div class="card"><div class="section"><div class="section-label">Jobs</div><table>';
+  html += '<div class="card"><div class="section-label">Jobs</div><table>';
   html += '<tr><th>Department</th><th class="r">Actual</th><th class="r">Target</th><th class="r">W/L</th><th style="width:80px"></th></tr>';
   deptNames.forEach(function(dp) {
-    var a = todayDepts[dp].jobs;
-    var t = Math.round(targets[dp].jobsPerDay * 10) / 10;
-    html += '<tr><td class="name">' + dp + '</td><td class="r">' + a + '</td><td class="r">' + t + '</td><td class="r">' + wl(a - t) + '</td><td>' + bar(a, t) + '</td></tr>';
+    var a = actuals[dp].jobs;
+    var tgt = t.jobs[dp];
+    html += '<tr><td class="name">' + dp + '</td><td class="r">' + a + '</td><td class="r">' + tgt + '</td><td class="r">' + wl(a - tgt) + '</td><td>' + bar(a, tgt) + '</td></tr>';
   });
-  html += '</table></div></div>';
+  html += '</table></div>';
 
   // Revenue
-  html += '<div class="card"><div class="section"><div class="section-label">Revenue</div><table>';
+  html += '<div class="card"><div class="section-label">Revenue</div><table>';
   html += '<tr><th>Department</th><th class="r">Actual</th><th class="r">Target</th><th class="r">W/L</th><th style="width:80px"></th></tr>';
   deptNames.forEach(function(dp) {
-    var a = todayDepts[dp].rev;
-    var t = targets[dp].rpd;
-    html += '<tr><td class="name">' + dp + '</td><td class="r">' + fmt(a) + '</td><td class="r">' + fmt(t) + '</td><td class="r">' + wl(a - t, true) + '</td><td>' + bar(a, t) + '</td></tr>';
+    var a = actuals[dp].rev;
+    var tgt = t.rev[dp];
+    html += '<tr><td class="name">' + dp + '</td><td class="r">' + fmt(a) + '</td><td class="r">' + fmt(tgt) + '</td><td class="r">' + wl(a - tgt, true) + '</td><td>' + bar(a, tgt) + '</td></tr>';
   });
-  html += '</table></div></div>';
+  html += '</table></div>';
 
   // Other Goals
-  html += '<div class="card"><div class="section"><div class="section-label">Other Goals</div><table>';
+  html += '<div class="card"><div class="section-label">Other Goals</div><table>';
   html += '<tr><th>Goal</th><th class="r">Actual</th><th class="r">Target</th><th class="r">W/L</th><th style="width:80px"></th></tr>';
   var goals = [
-    { name: 'Google Reviews', a: 0, t: parseInt(document.getElementById('tReviews').value) },
-    { name: 'Plan Sales', a: planSales, t: parseInt(document.getElementById('tPlans').value) },
-    { name: 'Leads Run', a: leadsRun, t: leadsTarget }
+    { name: 'Google Reviews', a: 0, t: t.reviews },
+    { name: 'Plan Sales', a: planSales, t: t.plans },
+    { name: 'Leads Run', a: leadsRun, t: t.leads }
   ];
   goals.forEach(function(g) {
     html += '<tr><td class="name">' + g.name + '</td><td class="r">' + g.a + '</td><td class="r">' + g.t + '</td><td class="r">' + wl(g.a - g.t) + '</td><td>' + bar(g.a, g.t) + '</td></tr>';
   });
-  html += '</table></div></div>';
+  html += '</table></div>';
 
   document.getElementById('content').innerHTML = html;
 }
