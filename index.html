@@ -188,6 +188,22 @@ function classifyJob(j) {
   return JOB_TYPE_MAP[jt] || null; // null = excluded
 }
 
+// Get the date portion from a completion_date value
+// Handles: "2026-02-05", "2026-02-05T14:30:00", "2026-02-05T14:30:00+00:00" etc.
+function dateOf(val) {
+  if (!val) return '';
+  return String(val).substring(0, 10);
+}
+
+// Get today's date in LOCAL time (not UTC)
+function localToday() {
+  var d = new Date();
+  var y = d.getFullYear();
+  var m = String(d.getMonth() + 1).padStart(2, '0');
+  var day = String(d.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + day;
+}
+
 // Persist targets in localStorage
 var TARGET_KEYS = ['tJobIns','tJobSvc','tJobMnt','tJobDct','tRevIns','tRevSvc','tRevMnt','tRevDct','tReviews','tPlans','tLeads'];
 
@@ -262,14 +278,17 @@ function bar(actual, target) {
 
 async function init() {
   loadTargets();
-  document.getElementById('pickDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('pickDate').value = localToday();
 
   try {
     allJobs = await sbFetch('completed_jobs_public', { order: 'completion_date.desc', limit: '10000', job_id: 'not.is.null' });
-    document.getElementById('status').textContent = allJobs.length + ' jobs loaded';
+
+    // Show latest date in data for debugging
+    var latestDate = allJobs.length > 0 ? allJobs[0].completion_date : 'none';
+    document.getElementById('status').textContent = allJobs.length + ' jobs loaded | latest in data: ' + latestDate;
     render();
   } catch(e) {
-    document.getElementById('status').textContent = 'Connection failed';
+    document.getElementById('status').textContent = 'Connection failed: ' + e.message;
   }
 }
 
@@ -280,8 +299,8 @@ function render() {
   var t = getTargets();
   var deptNames = ['Install','Service','Maintenance','Ducts'];
 
-  // Today's jobs - classify using job_type mapping (matching Excel)
-  var todayJobs = allJobs.filter(function(j) { return j.completion_date === date; });
+  // Today's jobs - use dateOf() to handle datetime formats
+  var todayJobs = allJobs.filter(function(j) { return dateOf(j.completion_date) === date; });
   var actuals = { Install: { rev: 0, jobs: 0 }, Service: { rev: 0, jobs: 0 }, Maintenance: { rev: 0, jobs: 0 }, Ducts: { rev: 0, jobs: 0 } };
   var excluded = 0;
 
@@ -295,7 +314,7 @@ function render() {
     }
   });
 
-  // Goal actuals - counted from today's jobs by job_type name
+  // Goal actuals
   var planSales = todayJobs.filter(function(j) {
     var jt = (j.job_type || '').trim();
     return jt === 'Residential Membership Plan Visit';
@@ -343,7 +362,8 @@ function render() {
 
   // Status line
   var counted = actuals.Install.jobs + actuals.Service.jobs + actuals.Maintenance.jobs + actuals.Ducts.jobs;
-  document.getElementById('status').textContent = allJobs.length + ' jobs loaded | ' + date + ': ' + todayJobs.length + ' total, ' + counted + ' counted, ' + excluded + ' excluded';
+  var latestDate = allJobs.length > 0 ? allJobs[0].completion_date : 'none';
+  document.getElementById('status').textContent = allJobs.length + ' jobs | latest: ' + latestDate + ' | ' + date + ': ' + todayJobs.length + ' total, ' + counted + ' counted, ' + excluded + ' excluded';
 
   document.getElementById('content').innerHTML = html;
 }
