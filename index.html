@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Win the Day</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script>
+    (function() {
+      const pwd = prompt('Password:');
+      if (pwd !== 'jds2025') {
+        document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#f472b6;font-family:DM Sans,sans-serif;">Access denied.</div>';
+        throw new Error('denied');
+      }
+    })();
+  </script>
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --card: #1a1a24;
+      --border: #2a2a3a;
+      --text: #f0f0f5;
+      --muted: #8888a0;
+      --dim: #555566;
+      --green: #34d399;
+      --rose: #f472b6;
+      --amber: #fbbf24;
+      --blue: #4d7cff;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding:32px; }
+    .page { max-width:700px; margin:0 auto; }
+
+    h1 { font-size:20px; font-weight:600; margin-bottom:24px; display:flex; align-items:center; gap:10px; }
+    h1 span { font-size:12px; color:var(--muted); font-weight:400; }
+
+    .controls { display:flex; gap:12px; align-items:flex-end; margin-bottom:24px; flex-wrap:wrap; }
+    .field { display:flex; flex-direction:column; gap:4px; }
+    .field label { font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--dim); }
+    input, select { padding:7px 10px; background:var(--card); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:inherit; font-size:13px; outline:none; }
+    input:focus { border-color:var(--blue); }
+    input[type="number"] { width:80px; font-family:'JetBrains Mono',monospace; font-size:12px; }
+
+    .section { margin-bottom:20px; }
+    .section-label { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); margin-bottom:8px; }
+
+    table { width:100%; border-collapse:collapse; }
+    th { text-align:left; padding:8px 10px; font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--dim); border-bottom:1px solid var(--border); }
+    th.r { text-align:right; }
+    td { padding:8px 10px; font-family:'JetBrains Mono',monospace; font-size:13px; border-bottom:1px solid rgba(42,42,58,.4); }
+    td.name { font-family:'DM Sans',sans-serif; font-weight:500; }
+    td.r { text-align:right; }
+    tr:last-child td { border-bottom:none; }
+
+    .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; margin-bottom:16px; }
+
+    .win { color:var(--green); }
+    .lose { color:var(--rose); }
+    .even { color:var(--amber); }
+
+    .bar { width:100%; height:5px; background:rgba(255,255,255,.06); border-radius:3px; overflow:hidden; }
+    .bar-fill { height:100%; border-radius:3px; transition:width .4s; }
+    .bar-fill.g { background:var(--green); }
+    .bar-fill.a { background:var(--amber); }
+    .bar-fill.r { background:var(--rose); }
+
+    .settings-toggle { cursor:pointer; font-size:12px; color:var(--dim); margin-bottom:12px; user-select:none; }
+    .settings-toggle:hover { color:var(--muted); }
+    .settings-body { display:none; }
+    .settings-body.open { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:16px; }
+
+    #status { font-size:11px; color:var(--dim); margin-bottom:16px; }
+  </style>
+</head>
+<body>
+<div class="page">
+  <h1>Win the Day <span>Daily Scorecard</span></h1>
+
+  <div class="controls">
+    <div class="field">
+      <label>Date</label>
+      <input type="date" id="pickDate" onchange="render()">
+    </div>
+  </div>
+
+  <div class="settings-toggle" id="stgToggle" onclick="toggleSettings()">&#9881; Settings &#9656;</div>
+  <div class="settings-body" id="stg">
+    <div class="field"><label>GM %</label><input type="number" id="gm" value="42" onchange="render()"></div>
+    <div class="field"><label>Monthly Opex</label><input type="number" id="opex" value="135000" step="1000" onchange="render()"></div>
+    <div class="field"><label>Work Days/Mo</label><input type="number" id="wdays" value="20" onchange="render()"></div>
+    <div class="field"><label>Install Trucks</label><input type="number" id="tIns" value="2" onchange="render()"></div>
+    <div class="field"><label>Service Trucks</label><input type="number" id="tSvc" value="4" onchange="render()"></div>
+    <div class="field"><label>Maint Trucks</label><input type="number" id="tMnt" value="3" onchange="render()"></div>
+    <div class="field"><label>Duct Trucks</label><input type="number" id="tDct" value="1" onchange="render()"></div>
+    <div class="field"><label>Google Rev Target</label><input type="number" id="tReviews" value="3" onchange="render()"></div>
+    <div class="field"><label>Plan Sales Target</label><input type="number" id="tPlans" value="3" onchange="render()"></div>
+  </div>
+
+  <div id="status">Loading...</div>
+  <div id="content"></div>
+</div>
+
+<script>
+var SB_URL = 'https://yquqqfqtrozpcxwkvvmf.supabase.co';
+var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlxdXFxZnF0cm96cGN4d2t2dm1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODMzNDgsImV4cCI6MjA4NDE1OTM0OH0.VjsmiyU5EXCrFXIzMsnO-3q1zkBekqhoErOyvbKhM8s';
+
+var allJobs = [];
+var allOpps = [];
+var settingsOpen = false;
+
+function toggleSettings() {
+  settingsOpen = !settingsOpen;
+  document.getElementById('stg').classList.toggle('open', settingsOpen);
+  document.getElementById('stgToggle').innerHTML = settingsOpen ? '&#9881; Settings &#9662;' : '&#9881; Settings &#9656;';
+}
+
+async function sbFetch(table, params) {
+  params = params || {};
+  var url = new URL(SB_URL + '/rest/v1/' + table);
+  Object.keys(params).forEach(function(k) { url.searchParams.append(k, params[k]); });
+  var r = await fetch(url, { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } });
+  return r.json();
+}
+
+function n(v) { var x = parseFloat(v); return isNaN(x) ? 0 : x; }
+function fmt(v) { return '$' + Math.round(v).toLocaleString('en-CA'); }
+
+function dept(j) {
+  var bu = (j.business_unit || '').toLowerCase();
+  if (bu.indexOf('install') >= 0 || bu.indexOf('sales') >= 0) return 'Install';
+  if (bu.indexOf('duct') >= 0) return 'Ducts';
+  if (bu.indexOf('maintenance') >= 0) return 'Maintenance';
+  return 'Service';
+}
+
+function wl(val, money) {
+  var cls = val > 0 ? 'win' : val < 0 ? 'lose' : 'even';
+  var sign = val > 0 ? '+' : '';
+  var txt = money ? fmt(val) : (Math.round(val * 10) / 10);
+  return '<span class="' + cls + '">' + sign + txt + '</span>';
+}
+
+function bar(actual, target) {
+  if (!target) return '';
+  var pct = Math.min(actual / target * 100, 100);
+  var c = pct >= 100 ? 'g' : pct >= 70 ? 'a' : 'r';
+  return '<div class="bar"><div class="bar-fill ' + c + '" style="width:' + pct + '%"></div></div>';
+}
+
+async function init() {
+  var today = new Date().toISOString().split('T')[0];
+  document.getElementById('pickDate').value = today;
+
+  try {
+    var results = await Promise.all([
+      sbFetch('completed_jobs_public', { order: 'completion_date.desc', limit: '10000', job_id: 'not.is.null' }),
+      sbFetch('opportunities_estimates', { order: 'creation_date.desc', limit: '5000' })
+    ]);
+    allJobs = results[0];
+    allOpps = results[1];
+    document.getElementById('status').textContent = allJobs.length + ' jobs loaded';
+    render();
+  } catch(e) {
+    document.getElementById('status').textContent = 'Connection failed';
+  }
+}
+
+function render() {
+  var date = document.getElementById('pickDate').value;
+  if (!date || !allJobs.length) return;
+
+  var d = new Date(date + 'T00:00:00');
+  var monthStart = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
+  var monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0];
+
+  var wdays = parseInt(document.getElementById('wdays').value);
+
+  // Month-to-date totals for target calculation
+  var mtdJobs = allJobs.filter(function(j) { return j.completion_date && j.completion_date >= monthStart && j.completion_date <= monthEnd; });
+  var depts = { Install: { rev: 0, jobs: 0 }, Service: { rev: 0, jobs: 0 }, Maintenance: { rev: 0, jobs: 0 }, Ducts: { rev: 0, jobs: 0 } };
+  mtdJobs.forEach(function(j) { var dp = dept(j); depts[dp].rev += n(j.jobs_total_revenue); depts[dp].jobs++; });
+
+  // Daily targets from MTD (RPD = Revenue / Working Days, Jobs/Day = RPD / Avg Job)
+  var targets = {};
+  var deptNames = ['Install','Service','Maintenance','Ducts'];
+  deptNames.forEach(function(dp) {
+    var rpd = wdays > 0 ? depts[dp].rev / wdays : 0;
+    var avgJob = depts[dp].jobs > 0 ? depts[dp].rev / depts[dp].jobs : 0;
+    var jobsPerDay = avgJob > 0 ? rpd / avgJob : 0;
+    targets[dp] = { rpd: rpd, jobsPerDay: jobsPerDay };
+  });
+
+  // RPL for leads target
+  var salesUnits = ['hvac - sales', 'hvac - install', 'sales - old bu'];
+  var monthOpps = allOpps.filter(function(o) {
+    var od = o.creation_date || o.sold_date;
+    return od && od >= monthStart && od <= monthEnd && o.opportunity_status && salesUnits.indexOf((o.business_unit || '').toLowerCase()) >= 0 && n(o.estimate_subtotal) > 0;
+  });
+  var oppSet = {};
+  monthOpps.forEach(function(o) { oppSet[o.opportunity_number || o.estimate_id] = true; });
+  var totalOpps = Object.keys(oppSet).length;
+  var rpl = totalOpps > 0 ? depts.Install.rev / totalOpps : 0;
+
+  // Today's actuals
+  var todayJobs = allJobs.filter(function(j) { return j.completion_date === date; });
+  var todayDepts = { Install: { rev: 0, jobs: 0 }, Service: { rev: 0, jobs: 0 }, Maintenance: { rev: 0, jobs: 0 }, Ducts: { rev: 0, jobs: 0 } };
+  todayJobs.forEach(function(j) { var dp = dept(j); todayDepts[dp].rev += n(j.jobs_total_revenue); todayDepts[dp].jobs++; });
+
+  var planSales = todayJobs.filter(function(j) { var jt = (j.job_type || '').toLowerCase(); return jt.indexOf('membership') >= 0 || jt.indexOf('plan') >= 0; }).length;
+  var leadsRun = todayJobs.filter(function(j) { var jt = (j.job_type || '').toLowerCase(); return jt.indexOf('sales visit') >= 0 || jt.indexOf('sales follow') >= 0; }).length;
+  var leadsTarget = rpl > 0 ? Math.round(targets.Install.rpd / rpl) : 4;
+
+  var html = '';
+
+  // Jobs
+  html += '<div class="card"><div class="section"><div class="section-label">Jobs</div><table>';
+  html += '<tr><th>Department</th><th class="r">Actual</th><th class="r">Target</th><th class="r">W/L</th><th style="width:80px"></th></tr>';
+  deptNames.forEach(function(dp) {
+    var a = todayDepts[dp].jobs;
+    var t = Math.round(targets[dp].jobsPerDay * 10) / 10;
+    html += '<tr><td class="name">' + dp + '</td><td class="r">' + a + '</td><td class="r">' + t + '</td><td class="r">' + wl(a - t) + '</td><td>' + bar(a, t) + '</td></tr>';
+  });
+  html += '</table></div></div>';
+
+  // Revenue
+  html += '<div class="card"><div class="section"><div class="section-label">Revenue</div><table>';
+  html += '<tr><th>Department</th><th class="r">Actual</th><th class="r">Target</th><th class="r">W/L</th><th style="width:80px"></th></tr>';
+  deptNames.forEach(function(dp) {
+    var a = todayDepts[dp].rev;
+    var t = targets[dp].rpd;
+    html += '<tr><td class="name">' + dp + '</td><td class="r">' + fmt(a) + '</td><td class="r">' + fmt(t) + '</td><td class="r">' + wl(a - t, true) + '</td><td>' + bar(a, t) + '</td></tr>';
+  });
+  html += '</table></div></div>';
+
+  // Other Goals
+  html += '<div class="card"><div class="section"><div class="section-label">Other Goals</div><table>';
+  html += '<tr><th>Goal</th><th class="r">Actual</th><th class="r">Target</th><th class="r">W/L</th><th style="width:80px"></th></tr>';
+  var goals = [
+    { name: 'Google Reviews', a: 0, t: parseInt(document.getElementById('tReviews').value) },
+    { name: 'Plan Sales', a: planSales, t: parseInt(document.getElementById('tPlans').value) },
+    { name: 'Leads Run', a: leadsRun, t: leadsTarget }
+  ];
+  goals.forEach(function(g) {
+    html += '<tr><td class="name">' + g.name + '</td><td class="r">' + g.a + '</td><td class="r">' + g.t + '</td><td class="r">' + wl(g.a - g.t) + '</td><td>' + bar(g.a, g.t) + '</td></tr>';
+  });
+  html += '</table></div></div>';
+
+  document.getElementById('content').innerHTML = html;
+}
+
+init();
+</script>
+</body>
+</html>
