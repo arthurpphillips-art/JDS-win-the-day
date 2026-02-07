@@ -312,7 +312,7 @@
           <div class="tg-header"></div><div class="tg-header">Target</div><div></div>
           <div class="tg-label">Google Reviews</div><input type="number" id="tReviews" value="3" onchange="saveTargets(); render()"><div></div>
           <div class="tg-label">Plan Sales</div><input type="number" id="tPlans" value="3" onchange="saveTargets(); render()"><div></div>
-          <div class="tg-label">Leads Run</div><input type="number" id="tLeads" value="4" onchange="saveTargets(); render()"><div></div>
+          <div class="tg-label">Leads</div><input type="number" id="tLeads" value="4" onchange="saveTargets(); render()"><div></div>
         </div>
       </div>
     </div>
@@ -528,7 +528,7 @@ function renderForecast(days) {
   var goalRows = [
     { name: 'Google Reviews', key: 'reviews', getActual: function() { return 0; } },
     { name: 'Plan Sales', key: 'plans', getActual: function(day) { return day.planSales; } },
-    { name: 'Leads Run', key: 'leads', getActual: function(day) { return day.leadsRun; } }
+    { name: 'Leads', key: 'leads', getActual: function(day) { return day.leadsRun; } }
   ];
   goalRows.forEach(function(goal) {
     var target = t[goal.key];
@@ -633,7 +633,7 @@ function render() {
   var goals = [
     { name: 'Google Reviews', a: 0, t: t.reviews },
     { name: 'Plan Sales', a: planSales, t: t.plans },
-    { name: 'Leads Run', a: leadsRun, t: t.leads }
+    { name: 'Leads', a: leadsRun, t: t.leads }
   ];
   goals.forEach(function(g) {
     html += '<tr><td class="name">' + g.name + '</td><td class="r">' + g.a + '</td><td class="r">' + g.t + '</td><td class="r">' + wl(g.a - g.t) + '</td><td>' + bar(g.a, g.t) + '</td></tr>';
