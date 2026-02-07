@@ -204,6 +204,9 @@
     }
     .tab-panel { display:none; }
     .tab-panel.active { display:block; }
+
+    /* Separator row */
+    .sep-row td { border-top:1px solid var(--border); }
   </style>
 </head>
 <body>
@@ -259,7 +262,7 @@
 
     <!-- Other Goals Forecast -->
     <div class="card">
-      <div class="section-label">Other Goals</div>
+      <div class="section-label">Other Goals <span style="font-size:10px;color:var(--dim);text-transform:none;letter-spacing:0;">— Today only</span></div>
       <table class="forecast-table">
         <thead>
           <tr>
@@ -296,6 +299,7 @@
           <div class="tg-label">Service</div><input type="number" id="tJobSvc" value="16" step="1" onchange="saveTargets(); render()"><div></div>
           <div class="tg-label">Maintenance</div><input type="number" id="tJobMnt" value="7" step="1" onchange="saveTargets(); render()"><div></div>
           <div class="tg-label">Ducts</div><input type="number" id="tJobDct" value="0.5" step="0.1" onchange="saveTargets(); render()"><div></div>
+          <div class="tg-label">Leads</div><input type="number" id="tJobLeads" value="4" step="1" onchange="saveTargets(); render()"><div></div>
         </div>
 
         <div class="section-label" style="margin-bottom:10px;">Daily Revenue Targets ($)</div>
@@ -312,7 +316,7 @@
           <div class="tg-header"></div><div class="tg-header">Target</div><div></div>
           <div class="tg-label">Google Reviews</div><input type="number" id="tReviews" value="3" onchange="saveTargets(); render()"><div></div>
           <div class="tg-label">Plan Sales</div><input type="number" id="tPlans" value="3" onchange="saveTargets(); render()"><div></div>
-          <div class="tg-label">Leads</div><input type="number" id="tLeads" value="4" onchange="saveTargets(); render()"><div></div>
+          <div class="tg-label">Booking Rate (%)</div><input type="number" id="tBookingRate" value="75" onchange="saveTargets(); render()"><div></div>
         </div>
       </div>
     </div>
@@ -327,6 +331,7 @@ var SB_URL = 'https://yquqqfqtrozpcxwkvvmf.supabase.co';
 var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlxdXFxZnF0cm96cGN4d2t2dm1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg1ODMzNDgsImV4cCI6MjA4NDE1OTM0OH0.VjsmiyU5EXCrFXIzMsnO-3q1zkBekqhoErOyvbKhM8s';
 
 var allJobs = [];
+var forecastBookingData = null;
 
 // ========================================
 // JOB TYPE - DEPARTMENT MAPPING
@@ -370,7 +375,7 @@ function localToday() {
 // ========================================
 // TARGETS
 // ========================================
-var TARGET_KEYS = ['tJobIns','tJobSvc','tJobMnt','tJobDct','tRevIns','tRevSvc','tRevMnt','tRevDct','tReviews','tPlans','tLeads'];
+var TARGET_KEYS = ['tJobIns','tJobSvc','tJobMnt','tJobDct','tJobLeads','tRevIns','tRevSvc','tRevMnt','tRevDct','tReviews','tPlans','tBookingRate'];
 
 function saveTargets() {
   var data = {};
@@ -404,6 +409,7 @@ function getTargets() {
       Maintenance: parseFloat(document.getElementById('tJobMnt').value) || 0,
       Ducts: parseFloat(document.getElementById('tJobDct').value) || 0
     },
+    jobLeads: parseFloat(document.getElementById('tJobLeads').value) || 0,
     rev: {
       Install: parseFloat(document.getElementById('tRevIns').value) || 0,
       Service: parseFloat(document.getElementById('tRevSvc').value) || 0,
@@ -412,7 +418,7 @@ function getTargets() {
     },
     reviews: parseFloat(document.getElementById('tReviews').value) || 0,
     plans: parseFloat(document.getElementById('tPlans').value) || 0,
-    leads: parseFloat(document.getElementById('tLeads').value) || 0
+    bookingRate: parseFloat(document.getElementById('tBookingRate').value) || 75
   };
 }
 
@@ -461,6 +467,7 @@ async function loadForecast() {
     if (!response.ok) throw new Error('API returned ' + response.status);
     var data = await response.json();
     if (!data.success) throw new Error(data.error || 'Unknown error');
+    forecastBookingData = data.bookingData || null;
     renderForecast(data.days);
   } catch(e) {
     document.getElementById('forecastStatus').textContent = 'Failed to load forecast: ' + e.message;
@@ -481,7 +488,9 @@ function renderForecast(days) {
     document.getElementById('fgHead' + (i+1)).textContent = day.label;
   });
 
-  // Jobs table
+  // ==================
+  // JOBS TABLE
+  // ==================
   var jobsHtml = '';
   deptNames.forEach(function(dept) {
     jobsHtml += '<tr><td class="dept-name">' + dept + '<span class="target-hint">Target: ' + t.jobs[dept] + '</span></td>';
@@ -494,15 +503,27 @@ function renderForecast(days) {
     });
     jobsHtml += '</tr>';
   });
-  // Total row
-  jobsHtml += '<tr style="border-top:1px solid var(--border);"><td class="dept-name" style="color:var(--muted);">Total</td>';
+  // Leads row below Ducts
+  var leadsTarget = t.jobLeads;
+  jobsHtml += '<tr><td class="dept-name">Leads<span class="target-hint">Target: ' + leadsTarget + '</span></td>';
+  days.forEach(function(day) {
+    var actual = day.leadsRun;
+    var diff = actual - leadsTarget;
+    var cls = diff > 0 ? 'win' : diff < 0 ? 'lose' : 'even';
+    jobsHtml += '<td class="day-cell"><div class="val">' + actual + '</div>' + bar(actual, leadsTarget) + '<div class="wl ' + cls + '">' + (diff > 0 ? '+' : '') + (Math.round(diff*10)/10) + '</div></td>';
+  });
+  jobsHtml += '</tr>';
+  // Total row (departments only, no leads)
+  jobsHtml += '<tr class="sep-row"><td class="dept-name" style="color:var(--muted);">Total</td>';
   days.forEach(function(day) {
     jobsHtml += '<td class="day-cell"><div class="val" style="color:var(--muted);">' + day.totalJobs + '</div></td>';
   });
   jobsHtml += '</tr>';
   document.getElementById('forecastJobsBody').innerHTML = jobsHtml;
 
-  // Revenue table
+  // ==================
+  // REVENUE TABLE
+  // ==================
   var revHtml = '';
   deptNames.forEach(function(dept) {
     revHtml += '<tr><td class="dept-name">' + dept + '<span class="target-hint">Target: ' + fmt(t.rev[dept]) + '</span></td>';
@@ -516,30 +537,51 @@ function renderForecast(days) {
     revHtml += '</tr>';
   });
   // Total row
-  revHtml += '<tr style="border-top:1px solid var(--border);"><td class="dept-name" style="color:var(--muted);">Total</td>';
+  revHtml += '<tr class="sep-row"><td class="dept-name" style="color:var(--muted);">Total</td>';
   days.forEach(function(day) {
     revHtml += '<td class="day-cell"><div class="val" style="color:var(--muted);">' + fmt(day.totalRevenue) + '</div></td>';
   });
   revHtml += '</tr>';
+  // Revenue Sold row (leads revenue, separate from total)
+  revHtml += '<tr><td class="dept-name" style="color:var(--amber);">Revenue Sold<span class="target-hint" style="color:var(--dim);">Not yet earned</span></td>';
+  days.forEach(function(day) {
+    revHtml += '<td class="day-cell"><div class="val" style="color:var(--amber);">' + fmt(day.leadsRevenue) + '</div></td>';
+  });
+  revHtml += '</tr>';
   document.getElementById('forecastRevBody').innerHTML = revHtml;
 
-  // Other Goals table
+  // ==================
+  // OTHER GOALS TABLE (today only)
+  // ==================
   var goalsHtml = '';
   var goalRows = [
-    { name: 'Google Reviews', key: 'reviews', getActual: function() { return 0; } },
+    { name: 'Google Reviews', key: 'reviews', getActual: function() { return null; } },
     { name: 'Plan Sales', key: 'plans', getActual: function(day) { return day.planSales; } },
-    { name: 'Leads', key: 'leads', getActual: function(day) { return day.leadsRun; } }
+    { name: 'Booking Rate', key: 'bookingRate', getActual: function() { return null; } }
   ];
   goalRows.forEach(function(goal) {
     var target = t[goal.key];
-    goalsHtml += '<tr><td class="dept-name">' + goal.name + '<span class="target-hint">Target: ' + target + '</span></td>';
+    goalsHtml += '<tr><td class="dept-name">' + goal.name + '<span class="target-hint">Target: ' + (goal.key === 'bookingRate' ? target + '%' : target) + '</span></td>';
     days.forEach(function(day) {
-      var actual = goal.getActual(day);
-      var diff = actual - target;
-      var cls = diff > 0 ? 'win' : diff < 0 ? 'lose' : 'even';
+      if (!day.isToday) {
+        goalsHtml += '<td class="day-cell"><div class="val" style="color:var(--dim);">—</div></td>';
+        return;
+      }
       if (goal.key === 'reviews') {
         goalsHtml += '<td class="day-cell"><div class="val" style="color:var(--dim);">—</div><div style="font-size:10px;color:var(--dim);">Manual</div></td>';
+      } else if (goal.key === 'bookingRate') {
+        if (forecastBookingData && forecastBookingData.bookingRate !== null) {
+          var rate = forecastBookingData.bookingRate;
+          var diff = rate - target;
+          var cls = diff >= 0 ? 'win' : 'lose';
+          goalsHtml += '<td class="day-cell"><div class="val">' + rate + '%</div>' + bar(rate, target) + '<div class="wl ' + cls + '">' + (diff >= 0 ? '+' : '') + diff + '%</div><div style="font-size:10px;color:var(--dim);">' + forecastBookingData.bookedCalls + '/' + forecastBookingData.inboundCalls + ' calls</div></td>';
+        } else {
+          goalsHtml += '<td class="day-cell"><div class="val" style="color:var(--dim);">—</div><div style="font-size:10px;color:var(--dim);">No data</div></td>';
+        }
       } else {
+        var actual = goal.getActual(day);
+        var diff = actual - target;
+        var cls = diff > 0 ? 'win' : diff < 0 ? 'lose' : 'even';
         goalsHtml += '<td class="day-cell"><div class="val">' + actual + '</div>' + bar(actual, target) + '<div class="wl ' + cls + '">' + (diff > 0 ? '+' : '') + (Math.round(diff*10)/10) + '</div></td>';
       }
     });
@@ -605,9 +647,17 @@ function render() {
     return jt === 'Sales Visit' || jt === 'Sales Follow Up';
   }).length;
 
+  var leadsRevenue = 0;
+  todayJobs.forEach(function(j) {
+    var jt = (j.job_type || '').trim();
+    if (jt === 'Sales Visit' || jt === 'Sales Follow Up') {
+      leadsRevenue += n(j.jobs_total_revenue);
+    }
+  });
+
   var html = '';
 
-  // Jobs
+  // Jobs (with Leads row)
   html += '<div class="card"><div class="section-label">Jobs</div><table>';
   html += '<tr><th>Department</th><th class="r">Actual</th><th class="r">Target</th><th class="r">W/L</th><th style="width:80px"></th></tr>';
   deptNames.forEach(function(dp) {
@@ -615,29 +665,50 @@ function render() {
     var tgt = t.jobs[dp];
     html += '<tr><td class="name">' + dp + '</td><td class="r">' + a + '</td><td class="r">' + tgt + '</td><td class="r">' + wl(a - tgt) + '</td><td>' + bar(a, tgt) + '</td></tr>';
   });
+  // Leads row
+  html += '<tr><td class="name">Leads</td><td class="r">' + leadsRun + '</td><td class="r">' + t.jobLeads + '</td><td class="r">' + wl(leadsRun - t.jobLeads) + '</td><td>' + bar(leadsRun, t.jobLeads) + '</td></tr>';
   html += '</table></div>';
 
-  // Revenue
+  // Revenue (with Revenue Sold row)
   html += '<div class="card"><div class="section-label">Revenue</div><table>';
   html += '<tr><th>Department</th><th class="r">Actual</th><th class="r">Target</th><th class="r">W/L</th><th style="width:80px"></th></tr>';
+  var totalActualRev = 0;
+  var totalTargetRev = 0;
   deptNames.forEach(function(dp) {
     var a = actuals[dp].rev;
     var tgt = t.rev[dp];
+    totalActualRev += a;
+    totalTargetRev += tgt;
     html += '<tr><td class="name">' + dp + '</td><td class="r">' + fmt(a) + '</td><td class="r">' + fmt(tgt) + '</td><td class="r">' + wl(a - tgt, true) + '</td><td>' + bar(a, tgt) + '</td></tr>';
   });
+  // Total row
+  html += '<tr style="border-top:1px solid var(--border);"><td class="name" style="color:var(--muted);">Total</td><td class="r" style="color:var(--muted);">' + fmt(totalActualRev) + '</td><td class="r" style="color:var(--muted);">' + fmt(totalTargetRev) + '</td><td class="r">' + wl(totalActualRev - totalTargetRev, true) + '</td><td>' + bar(totalActualRev, totalTargetRev) + '</td></tr>';
+  // Revenue Sold row
+  html += '<tr><td class="name" style="color:#fbbf24;">Revenue Sold</td><td class="r" style="color:#fbbf24;">' + fmt(leadsRevenue) + '</td><td class="r" style="color:var(--dim);">—</td><td class="r" style="color:var(--dim);">—</td><td></td></tr>';
   html += '</table></div>';
 
-  // Other Goals
+  // Other Goals (Google Reviews, Plan Sales, Booking Rate)
   html += '<div class="card"><div class="section-label">Other Goals</div><table>';
   html += '<tr><th>Goal</th><th class="r">Actual</th><th class="r">Target</th><th class="r">W/L</th><th style="width:80px"></th></tr>';
-  var goals = [
-    { name: 'Google Reviews', a: 0, t: t.reviews },
-    { name: 'Plan Sales', a: planSales, t: t.plans },
-    { name: 'Leads', a: leadsRun, t: t.leads }
-  ];
-  goals.forEach(function(g) {
-    html += '<tr><td class="name">' + g.name + '</td><td class="r">' + g.a + '</td><td class="r">' + g.t + '</td><td class="r">' + wl(g.a - g.t) + '</td><td>' + bar(g.a, g.t) + '</td></tr>';
-  });
+
+  // Google Reviews
+  html += '<tr><td class="name">Google Reviews</td><td class="r" style="color:var(--dim);">—</td><td class="r">' + t.reviews + '</td><td class="r" style="color:var(--dim);">Manual</td><td></td></tr>';
+
+  // Plan Sales
+  html += '<tr><td class="name">Plan Sales</td><td class="r">' + planSales + '</td><td class="r">' + t.plans + '</td><td class="r">' + wl(planSales - t.plans) + '</td><td>' + bar(planSales, t.plans) + '</td></tr>';
+
+  // Booking Rate
+  if (forecastBookingData && forecastBookingData.bookingRate !== null) {
+    var br = forecastBookingData.bookingRate;
+    var brTarget = t.bookingRate;
+    var brDiff = br - brTarget;
+    var brSign = brDiff >= 0 ? '+' : '';
+    var brCls = brDiff >= 0 ? 'win' : 'lose';
+    html += '<tr><td class="name">Booking Rate</td><td class="r">' + br + '%</td><td class="r">' + brTarget + '%</td><td class="r"><span class="' + brCls + '">' + brSign + brDiff + '%</span></td><td>' + bar(br, brTarget) + '</td></tr>';
+  } else {
+    html += '<tr><td class="name">Booking Rate</td><td class="r" style="color:var(--dim);">—</td><td class="r">' + t.bookingRate + '%</td><td class="r" style="color:var(--dim);">—</td><td></td></tr>';
+  }
+
   html += '</table></div>';
 
   var counted = actuals.Install.jobs + actuals.Service.jobs + actuals.Maintenance.jobs + actuals.Ducts.jobs;
