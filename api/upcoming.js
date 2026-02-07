@@ -21,7 +21,7 @@ const JOB_TYPE_MAP = {
   'Residential Duct Cleaning': 'Ducts',
 };
 
-// Job types that count as "Leads Run" goal
+// Job types that count as "Leads" (sales appointments)
 const LEAD_JOB_TYPES = ['Sales Visit', 'Sales Follow Up'];
 // Job types that count as "Plan Sales" goal
 const PLAN_JOB_TYPES = ['Residential Membership Plan Visit'];
@@ -155,19 +155,9 @@ export default async function handler(req, res) {
 
     // =============================================
     // APPOINTMENT-BASED REVENUE ALLOCATION
-    // Count how many appointments each job has per day
-    // and total across all days. Revenue is split
-    // proportionally by appointment count.
-    //
-    // e.g. $30k job with 2 appts on Day 1, 1 appt on Day 2:
-    //   Day 1: 2/3 * $30k = $20k
-    //   Day 2: 1/3 * $30k = $10k
     // =============================================
-
-    // Count appointments per job per day, and total per job
-    // dayApptCounts[dayIndex] = { jobId: count }
     const dayApptCounts = [];
-    const jobTotalAppts = {}; // jobId -> total appointment count across all days
+    const jobTotalAppts = {};
 
     allDayAppointments.forEach((appointments, dayIdx) => {
       const counts = {};
@@ -179,7 +169,6 @@ export default async function handler(req, res) {
       dayApptCounts.push(counts);
     });
 
-    // Track multi-day jobs for debugging
     const multiDayJobs = [];
 
     // Build day summaries with department breakdowns
@@ -188,6 +177,7 @@ export default async function handler(req, res) {
       const apptCounts = dayApptCounts[i];
       const depts = { Install: { jobs: 0, rev: 0 }, Service: { jobs: 0, rev: 0 }, Maintenance: { jobs: 0, rev: 0 }, Ducts: { jobs: 0, rev: 0 } };
       let leadsRun = 0;
+      let leadsRevenue = 0;
       let planSales = 0;
       let totalJobs = 0;
       let totalRevenue = 0;
@@ -220,8 +210,13 @@ export default async function handler(req, res) {
           });
         }
 
-        // Check leads and plans regardless of department
-        if (LEAD_JOB_TYPES.includes(jobTypeName)) leadsRun++;
+        // Track leads (Sales Visit / Sales Follow Up) separately
+        if (LEAD_JOB_TYPES.includes(jobTypeName)) {
+          leadsRun++;
+          leadsRevenue += allocatedRevenue;
+        }
+
+        // Track plan sales
         if (PLAN_JOB_TYPES.includes(jobTypeName)) planSales++;
 
         if (dept) {
@@ -242,6 +237,7 @@ export default async function handler(req, res) {
         totalRevenue: Math.round(totalRevenue),
         departments: depts,
         leadsRun,
+        leadsRevenue: Math.round(leadsRevenue),
         planSales,
         excluded
       };
