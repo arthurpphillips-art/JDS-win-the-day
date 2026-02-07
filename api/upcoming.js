@@ -120,6 +120,55 @@ async function batchFetchJobs(tenantId, headers, jobIds) {
   return jobs;
 }
 
+// Fetch today's inbound call booking rate from ServiceTitan
+async function fetchTodayBookingRate(tenantId, headers, todayStr, tomorrowStr) {
+  try {
+    const allCalls = [];
+    let page = 1;
+    let hasMore = true;
+    while (hasMore) {
+      const url = new URL(`https://api.servicetitan.io/telecom/v2/tenant/${tenantId}/calls`);
+      url.searchParams.append('createdOnOrAfter', todayStr);
+      url.searchParams.append('createdBefore', tomorrowStr);
+      url.searchParams.append('page', page);
+      url.searchParams.append('pageSize', 200);
+      const response = await fetch(url, { headers });
+      if (!response.ok) {
+        console.error('Calls fetch failed:', response.status);
+        return null;
+      }
+      const data = await response.json();
+      allCalls.push(...(data.data || []));
+      hasMore = data.hasMore;
+      page++;
+      if (page > 10) break;
+    }
+
+    // Count inbound calls and booked inbound calls
+    let inboundCalls = 0;
+    let bookedCalls = 0;
+
+    allCalls.forEach(c => {
+      const call = c.leadCall || c;
+      const direction = (call.direction || '').toLowerCase();
+      if (direction !== 'inbound') return;
+      inboundCalls++;
+      if (call.jobId || call.isBooked || (call.callType || '') === 'Booked') {
+        bookedCalls++;
+      }
+    });
+
+    return {
+      inboundCalls,
+      bookedCalls,
+      bookingRate: inboundCalls > 0 ? Math.round((bookedCalls / inboundCalls) * 100) : null
+    };
+  } catch (e) {
+    console.error('Booking rate fetch error:', e);
+    return null;
+  }
+}
+
 export default async function handler(req, res) {
   try {
     const accessToken = await getAccessToken();
@@ -131,15 +180,23 @@ export default async function handler(req, res) {
 
     const businessDays = getThreeBusinessDays();
 
-    // Fetch appointments for all 3 days in parallel
-    const allDayAppointments = await Promise.all(
-      businessDays.map(day => {
-        const dateStr = toDateStr(day);
-        const nextDay = new Date(day);
-        nextDay.setDate(nextDay.getDate() + 1);
-        return fetchDayAppointments(tenantId, headers, dateStr, toDateStr(nextDay));
-      })
-    );
+    // Fetch appointments for all 3 days and today's booking rate in parallel
+    const todayStr = toDateStr(businessDays[0]);
+    const tomorrowDate = new Date(businessDays[0]);
+    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+    const tomorrowStr = toDateStr(tomorrowDate);
+
+    const [allDayAppointments, bookingData] = await Promise.all([
+      Promise.all(
+        businessDays.map(day => {
+          const dateStr = toDateStr(day);
+          const nextDay = new Date(day);
+          nextDay.setDate(nextDay.getDate() + 1);
+          return fetchDayAppointments(tenantId, headers, dateStr, toDateStr(nextDay));
+        })
+      ),
+      fetchTodayBookingRate(tenantId, headers, todayStr, tomorrowStr)
+    ]);
 
     // Collect unique job IDs per day
     const allJobIds = new Set();
@@ -158,8 +215,7 @@ export default async function handler(req, res) {
     // =============================================
     const dayApptCounts = [];
     const jobTotalAppts = {};
-
-    allDayAppointments.forEach((appointments, dayIdx) => {
+    allDayAppointments.forEach((appointments) => {
       const counts = {};
       appointments.forEach(a => {
         if (!a.jobId) return;
@@ -196,7 +252,7 @@ export default async function handler(req, res) {
         const totalAppts = jobTotalAppts[id] || 1;
         const allocatedRevenue = Math.round((fullPreTaxRevenue * dayAppts / totalAppts) * 100) / 100;
 
-        // Track multi-day jobs for debugging (only log once on first day seen)
+        // Track multi-day jobs for debugging
         if (totalAppts > 1 && i === 0 && apptCounts[id]) {
           multiDayJobs.push({
             jobId: id,
@@ -210,16 +266,14 @@ export default async function handler(req, res) {
           });
         }
 
-        // Track leads (Sales Visit / Sales Follow Up) separately
+        // Check plans regardless of department
+        if (PLAN_JOB_TYPES.includes(jobTypeName)) planSales++;
+
+        // Leads (Sales Visit / Sales Follow Up) - tracked separately from dept revenue
         if (LEAD_JOB_TYPES.includes(jobTypeName)) {
           leadsRun++;
           leadsRevenue += allocatedRevenue;
-        }
-
-        // Track plan sales
-        if (PLAN_JOB_TYPES.includes(jobTypeName)) planSales++;
-
-        if (dept) {
+        } else if (dept) {
           depts[dept].jobs++;
           depts[dept].rev += allocatedRevenue;
           totalJobs++;
@@ -247,6 +301,7 @@ export default async function handler(req, res) {
       success: true,
       timestamp: new Date().toISOString(),
       days,
+      bookingData,
       multiDayJobs: multiDayJobs.length > 0 ? multiDayJobs : undefined
     });
   } catch (error) {
